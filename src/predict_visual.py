@@ -4,79 +4,90 @@ import joblib
 import numpy as np
 from PIL import Image, ImageDraw
 
-# Caminhos para os módulos
+# Ajusta o path para os módulos core
 sys.path.append(os.path.join(os.path.dirname(__file__), 'core'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'detection'))
 
 from processor import PlantProcessor
 from extractor import FeatureExtractor
-from detector import FieldDetector
 
 def main():
+    # 1. Configuração de Caminhos
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     model_path = os.path.join(root_dir, "data/output/modelo_plantas.pkl")
     raw_dir = os.path.join(root_dir, "data/raw")
-    output_dir = os.path.join(root_dir, "data/output/predicoes_campo")
+    output_dir = os.path.join(root_dir, "data/output/predicoes_diretas")
     
     os.makedirs(output_dir, exist_ok=True)
 
+    # 2. Carregar o Modelo Treinado e Componentes
     if not os.path.exists(model_path):
-        print("Erro: Modelo não encontrado.")
+        print("Erro: Modelo não encontrado em data/output/modelo_plantas.pkl")
         return
     
     model = joblib.load(model_path)
-    processor = PlantProcessor()
+    processor = PlantProcessor(threshold=25)
     extractor = FeatureExtractor()
-    detector = FieldDetector()
 
-    target_files = [f for f in os.listdir(raw_dir) if f.lower().endswith(('.jpg', '.png')) and os.path.isfile(os.path.join(raw_dir, f))]
+    # 3. Localizar fotos para teste (na raiz de data/raw)
+    target_files = [f for f in os.listdir(raw_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png')) and os.path.isfile(os.path.join(raw_dir, f))]
+    
+    if not target_files:
+        print(f"Nenhuma foto encontrada para teste direto em {raw_dir}")
+        return
 
     print(f"{'='*60}")
-    print(f"SISTEMA DE DETECÇÃO DE CAMPO")
+    print(f"MODO DE INFERÊNCIA DIRETA (UMA CHAMADA POR FOTO)")
     print(f"{'='*60}\n")
 
     for filename in target_files:
         img_path = os.path.join(raw_dir, filename)
+        print(f"Analisando: {filename}")
+
+        # --- ETAPA 1: PROCESSAMENTO ---
         img_pil = Image.open(img_path).convert("RGB")
         img_array = np.array(img_pil)
         
-        # 1. Processamento (Core)
         exg = processor.get_exg(img_array)
         mask = processor.create_mask(exg)
 
-        # 2. Detecção (Detection) - Segmenta a imagem em várias plantas
-        detected_plants = detector.segment_plants(mask)
+        # --- ETAPA 2: EXTRAÇÃO DE CARACTERÍSTICAS ---
+        # Analisa a imagem como um todo (foco na planta principal)
+        features = extractor.get_shape_features(mask)
         
-        draw = ImageDraw.Draw(img_pil)
-        count_milho, count_erva = 0, 0
+        if features:
+            # Organiza os dados para o modelo
+            input_data = [[
+                features['area_px'], 
+                features['aspect_ratio'], 
+                features['solidez'], 
+                features['circularidade'], 
+                features['perimetro']
+            ]]
 
-        for plant in detected_plants:
-            # 3. Extração (Core) - Extrai métricas de cada planta segmentada
-            features = extractor.get_shape_features(plant['mask'])
+            # --- ETAPA 3: PREDIÇÃO ÚNICA ---
+            prediction = model.predict(input_data)[0]
+            probabilidades = model.predict_proba(input_data)[0]
+            confianca = np.max(probabilidades) * 100
+
+            # --- ETAPA 4: RESULTADO VISUAL ---
+            draw = ImageDraw.Draw(img_pil)
             
-            if features:
-                input_data = [[
-                    features['area_px'], features['aspect_ratio'], 
-                    features['solidez'], features['circularidade'], 
-                    features['perimetro']
-                ]]
+            # Define cor baseada na predição: Milho (Azul), Erva (Verde)
+            color = (0, 0, 255) if prediction == "milho" else (0, 255, 0)
+            text_label = f"RESULTADO: {prediction.upper()} ({confianca:.1f}%)"
 
-                # 4. Predição (ML)
-                prediction = model.predict(input_data)[0]
-                
-                # Coordenadas
-                slice_y, slice_x = plant['bbox']
-                y_min, y_max, x_min, x_max = slice_y.start, slice_y.stop, slice_x.start, slice_x.stop
+            # Desenha uma borda externa na imagem para indicar a classificação
+            draw.rectangle([0, 0, img_pil.size[0]-1, img_pil.size[1]-1], outline=color, width=20)
+            
+            # Adiciona o texto informativo
+            print(f"  -> {text_label}")
 
-                color = (0, 0, 255) if prediction == "milho" else (0, 255, 0)
-                if prediction == "milho": count_milho += 1
-                else: count_erva += 1
-
-                draw.rectangle([x_min, y_min, x_max, y_max], outline=color, width=5)
-
-        save_path = os.path.join(output_dir, f"analise_{filename}")
-        img_pil.save(save_path)
-        print(f"[PROCESSADO] {filename}: Milhos: {count_milho} | Ervas: {count_erva}")
+            # Salvar o resultado
+            save_path = os.path.join(output_dir, f"resultado_{filename}")
+            img_pil.save(save_path)
+            print(f"  -> Salvo em: {save_path}\n")
+        else:
+            print(f"  -> [AVISO] Nenhuma vegetação detectada em {filename}\n")
 
 if __name__ == "__main__":
     main()

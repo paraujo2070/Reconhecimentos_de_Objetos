@@ -28,8 +28,8 @@ def main():
 
     print(f"Treinando com {len(X_train)} amostras e testando com {len(X_test)}...")
 
-    # 4. Instanciar e Treinar o Random Forest
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    # 4. Instanciar e Treinar o Random Forest com balanceamento de peso
+    model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
     model.fit(X_train, y_train)
 
     # 5. Avaliar o Modelo

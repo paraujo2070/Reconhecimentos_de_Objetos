@@ -8,46 +8,25 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'core'))
 from processor import PlantProcessor
 from extractor import FeatureExtractor
 
-def run_analysis_pipeline(image_path, processor, extractor, output_img_dir):
-    """
-    Executa o pipeline sequencial:
-    1. Executa o Processor (Limpeza e Segmentação)
-    2. Executa o Extractor (Cálculo de métricas geométricas)
-    """
-    # ETAPA 1: PROCESSAMENTO (Lógica do processor.py)
-    img_array = processor.load_image(image_path)
-    exg = processor.get_exg(img_array)
-    mask = processor.create_mask(exg)
-    
-    # Salva o resultado visual (Auditoria Comercial)
-    processor.process_and_save(image_path, output_img_dir)
-    
-    # ETAPA 2: EXTRAÇÃO (Lógica do extractor.py)
-    features = extractor.get_shape_features(mask)
-    
-    return features
-
 def main():
-    # Setup de diretórios
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     raw_dir = os.path.join(root_dir, "data/raw")
-    processed_dir = os.path.join(root_dir, "data/processed")
     output_dir = os.path.join(root_dir, "data/output")
     
-    os.makedirs(processed_dir, exist_ok=True)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Instanciação das classes
     processor = PlantProcessor(threshold=25)
     extractor = FeatureExtractor()
     
     report_path = os.path.join(output_dir, "dataset_treinamento.csv")
     classes = ["milho", "erva_daninha"]
+    rotacoes = [0, 90, 180, 270] # Data Augmentation
 
     print(f"{'='*60}")
-    print(f"PIPELINE SEQUENCIAL: PROCESSAMENTO -> EXTRAÇÃO")
+    print(f"GERADOR DE DATASET COM DATA AUGMENTATION (ROTAÇÃO)")
     print(f"{'='*60}\n")
 
+    total_fotos = 0
     with open(report_path, mode='w', newline='') as csv_file:
         fieldnames = ['arquivo', 'classe', 'area_px', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro']
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -57,32 +36,40 @@ def main():
             input_folder = os.path.join(raw_dir, cls)
             if not os.path.exists(input_folder): continue
             
-            output_img_cls = os.path.join(processed_dir, cls)
-            os.makedirs(output_img_cls, exist_ok=True)
-
             files = [f for f in os.listdir(input_folder) if f.lower().endswith(('.jpg', '.png'))]
-            print(f"Classe: {cls.upper()} | {len(files)} imagens encontradas.")
+            total_fotos += len(files)
+            print(f"Classe: {cls.upper()} | {len(files)} fotos originais.")
 
             for filename in files:
                 img_path = os.path.join(input_folder, filename)
                 
                 try:
-                    # EXECUÇÃO DO PIPELINE
-                    data = run_analysis_pipeline(img_path, processor, extractor, output_img_cls)
+                    img_original = processor.load_image(img_path)
                     
-                    if data:
-                        data['arquivo'] = filename
-                        data['classe'] = cls
-                        # Gravação seletiva das colunas do CSV
-                        writer.writerow({k: data[k] for k in fieldnames})
-                        print(f"  [OK] {filename} processado e analisado.")
+                    for angulo in rotacoes:
+                        # 1. Rotaciona a imagem
+                        img_rotated = processor.rotate_image(img_original, angulo)
+                        
+                        # 2. Processa (Máscara)
+                        exg = processor.get_exg(img_rotated)
+                        mask = processor.create_mask(exg)
+                        
+                        # 3. Extrai características
+                        data = extractor.get_shape_features(mask)
+                        
+                        if data:
+                            data['arquivo'] = f"{angulo}_{filename}"
+                            data['classe'] = cls
+                            writer.writerow({k: data[k] for k in fieldnames})
+                    
+                    print(f"  [OK] {filename} (Geradas 4 variações)")
                         
                 except Exception as e:
-                    print(f"  [ERRO] Falha ao processar {filename}: {e}")
+                    print(f"  [ERRO] {filename}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"PROCESSO FINALIZADO!")
-    print(f"Relatório: {report_path}")
+    print(f"DATASET AMPLIADO COM SUCESSO!")
+    print(f"Total de linhas (dados): {total_fotos * len(rotacoes)}")
     print(f"{'='*60}")
 
 if __name__ == "__main__":
