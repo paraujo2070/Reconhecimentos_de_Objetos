@@ -3,7 +3,7 @@ import sys
 import shutil
 import logging
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("AgroVisionAPI")
 
-app = FastAPI(title="AgroVision API", description="Servidor para coleta e treinamento remoto")
+app = FastAPI(title="AgroVision API", description="Servidor para coleta e treinamento remoto (Suporte ONNX)")
 
 # --- MODELOS DE DADOS (Pydantic) ---
 class StatusResponse(BaseModel):
@@ -36,8 +36,15 @@ class StatusResponse(BaseModel):
 class TrainResponse(BaseModel):
     message: str
     csv_file: str
-    model_file: str
+    model_pkl: str
+    model_onnx: str
     samples: int
+
+class ModelInfo(BaseModel):
+    filename: str
+    format: str
+    size_bytes: int
+    created_at: str
 
 # --- UTILITÁRIOS ---
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -46,16 +53,18 @@ OUTPUT_DIR = os.path.join(ROOT_DIR, "data/output")
 
 def get_next_sequence(date_str: str) -> str:
     """Verifica qual a próxima sequência (seq01, seq02...) para a data atual."""
-    files = [f for f in os.listdir(OUTPUT_DIR) if date_str in f and f.endswith(".pkl")]
+    # Prioriza verificar arquivos .onnx para definir a sequência
+    files = [f for f in os.listdir(OUTPUT_DIR) if date_str in f and (f.endswith(".onnx") or f.endswith(".pkl"))]
     if not files:
         return "seq01"
     
     sequences = []
     for f in files:
         try:
-            # modelo_YYYYMMDD_seqXX.pkl -> extrai o XX
-            part = f.split("_seq")[-1].split(".")[0]
-            sequences.append(int(part))
+            # modelo_YYYYMMDD_seqXX.ext -> extrai o XX
+            if "_seq" in f:
+                part = f.split("_seq")[-1].split(".")[0]
+                sequences.append(int(part))
         except: continue
     
     next_num = max(sequences) + 1 if sequences else 1
@@ -98,12 +107,11 @@ async def get_status():
         counts[cls] = count
         total += count
     
-    # Lógica de balanço simples
     if total == 0:
         bal = "vazio"
     else:
         diff = abs(counts["milho"] - counts["erva_daninha"])
-        bal = "equilibrado" if diff < (total * 0.15) else "desbalanceado"
+        bal = "equilibrado" if diff < (total * 0.20) else "desbalanceado"
 
     logger.info(f"Status solicitado: {counts}")
     return {
@@ -115,18 +123,19 @@ async def get_status():
 
 @app.post("/train", response_model=TrainResponse, tags=["Treinamento"])
 async def train_model():
-    """Executa processamento e treinamento versionado."""
+    """Executa processamento e treinamento gerando PKL e ONNX."""
     date_str = datetime.now().strftime("%Y%m%d")
     seq = get_next_sequence(date_str)
     
     version_label = f"{date_str}_{seq}"
     csv_filename = f"dataset_{version_label}.csv"
     model_filename = f"modelo_{version_label}.pkl"
+    onnx_filename = f"modelo_{version_label}.onnx"
     
     csv_path = os.path.join(OUTPUT_DIR, csv_filename)
     model_path = os.path.join(OUTPUT_DIR, model_filename)
     
-    logger.info(f"Iniciando ciclo de treinamento: {version_label}")
+    logger.info(f"Iniciando ciclo de treinamento (ONNX): {version_label}")
     
     try:
         # 1. Processamento (ExG + Augmentation)
@@ -135,31 +144,33 @@ async def train_model():
         if samples == 0:
             raise HTTPException(status_code=400, detail="Nenhuma imagem encontrada para treinar.")
             
-        # 2. Treinamento (Random Forest)
+        # 2. Treinamento (Random Forest -> PKL & ONNX)
         final_model_path = run_training(csv_path=csv_path, model_output_path=model_path)
         
         if not final_model_path:
             raise Exception("Falha ao gerar arquivo de modelo.")
             
-        logger.info(f"Treinamento finalizado com sucesso: {model_filename}")
+        logger.info(f"Treinamento finalizado com sucesso: {version_label}")
         
         return {
             "message": "Treinamento concluído com sucesso",
             "csv_file": csv_filename,
-            "model_file": model_filename,
+            "model_pkl": model_filename,
+            "model_onnx": onnx_filename,
             "samples": samples
         }
         
     except Exception as e:
-        logger.error(f"Erro durante o treinamento: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"Erro durante o treinamento:\n{error_details}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/models", tags=["Modelos"])
+@app.get("/models", response_model=List[ModelInfo], tags=["Modelos"])
 async def list_models():
-    """Lista todos os modelos .pkl disponíveis no servidor."""
+    """Lista todos os modelos (.onnx e .pkl) disponíveis no servidor."""
     try:
-        files = [f for f in os.listdir(OUTPUT_DIR) if f.endswith(".pkl")]
-        # Ordena pelos mais recentes (assumindo padrão YYYYMMDD_seqXX)
+        files = [f for f in os.listdir(OUTPUT_DIR) if f.endswith((".pkl", ".onnx"))]
         files.sort(reverse=True)
         
         models = []
@@ -168,6 +179,7 @@ async def list_models():
             stats = os.stat(path)
             models.append({
                 "filename": f,
+                "format": "ONNX (Android)" if f.endswith(".onnx") else "PKL (Python)",
                 "size_bytes": stats.st_size,
                 "created_at": datetime.fromtimestamp(stats.st_ctime).isoformat()
             })
@@ -178,10 +190,7 @@ async def list_models():
 
 @app.get("/models/download/{filename}", tags=["Modelos"])
 async def download_model(filename: str):
-    """Faz o download de um arquivo de modelo específico."""
-    if not filename.endswith(".pkl"):
-        filename += ".pkl"
-        
+    """Faz o download de um arquivo de modelo específico (.onnx ou .pkl)."""
     file_path = os.path.join(OUTPUT_DIR, filename)
     
     if not os.path.exists(file_path):
@@ -197,5 +206,5 @@ async def download_model(filename: str):
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info("Iniciando servidor AgroVision...")
+    logger.info("Iniciando servidor AgroVision (Suporte ONNX)...")
     uvicorn.run(app, host="0.0.0.0", port=8000)

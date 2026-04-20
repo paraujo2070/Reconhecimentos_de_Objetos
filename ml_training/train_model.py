@@ -1,14 +1,20 @@
 import pandas as pd
 import os
+import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
 import joblib
+from skl2onnx import convert_sklearn
+from skl2onnx.common.data_types import FloatTensorType
 
 def run_training(csv_path=None, model_output_path=None):
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     target_csv = csv_path if csv_path else os.path.join(base_dir, "data/output/dataset_treinamento.csv")
     target_model = model_output_path if model_output_path else os.path.join(base_dir, "data/output/modelo_plantas.pkl")
+    
+    # Define o caminho do ONNX baseado no nome do modelo
+    onnx_output_path = target_model.replace(".pkl", ".onnx")
     
     if not os.path.exists(target_csv):
         print(f"[TRAINER] Erro: Arquivo {target_csv} não encontrado.")
@@ -18,7 +24,7 @@ def run_training(csv_path=None, model_output_path=None):
     df = pd.read_csv(target_csv)
     
     features = ['area_px', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro']
-    X = df[features]
+    X = df[features].values.astype(np.float32) # ONNX exige float32
     y = df['classe']
 
     # Treinamento
@@ -27,14 +33,24 @@ def run_training(csv_path=None, model_output_path=None):
     model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
     model.fit(X_train, y_train)
 
-    # Avaliação simples para o log
+    # Avaliação
     y_pred = model.predict(X_test)
     accuracy = accuracy_score(y_test, y_pred)
-    
     print(f"[TRAINER] Modelo treinado com {accuracy*100:.2f}% de acurácia.")
 
+    # 1. Salva PKL (Legacy/Python)
     joblib.dump(model, target_model)
-    print(f"[TRAINER] Salvo em: {target_model}")
+    
+    # 2. Salva ONNX (Mobile/Universal)
+    try:
+        initial_type = [('float_input', FloatTensorType([None, 5]))]
+        onx = convert_sklearn(model, initial_types=initial_type, target_opset=12)
+        with open(onnx_output_path, "wb") as f:
+            f.write(onx.SerializeToString())
+        print(f"[TRAINER] Exportado para ONNX: {onnx_output_path}")
+    except Exception as e:
+        print(f"[TRAINER] Erro ao exportar ONNX: {e}")
+
     return target_model
 
 if __name__ == "__main__":
