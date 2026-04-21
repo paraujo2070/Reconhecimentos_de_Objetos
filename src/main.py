@@ -26,14 +26,18 @@ def run_processing(output_csv_path=None):
     
     total_dados = 0
     with open(report_path, mode='w', newline='') as csv_file:
-        fieldnames = ['arquivo', 'classe', 'area_px', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro']
+        fieldnames = ['arquivo', 'classe', 'area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm']
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
 
         for cls in classes:
-            input_folder = os.path.join(raw_dir, cls)
+            # Se output_csv_path contiver "teste", busca na pasta raw/teste/classe
+            # Caso contrário, busca na pasta raw/classe
+            sub_folder = "teste" if output_csv_path and "teste" in output_csv_path else ""
+            input_folder = os.path.join(raw_dir, sub_folder, cls)
+            
             if not os.path.exists(input_folder): 
-                os.makedirs(input_folder, exist_ok=True)
+                print(f"  [AVISO] Pasta não encontrada: {input_folder}")
                 continue
             
             files = [f for f in os.listdir(input_folder) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]

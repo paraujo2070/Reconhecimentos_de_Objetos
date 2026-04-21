@@ -25,8 +25,18 @@ class PlantProcessor:
         return exg
 
     def create_mask(self, exg_array):
-        """Cria uma máscara binária baseada no threshold."""
-        mask = np.where(exg_array > self.threshold, 255, 0).astype(np.uint8)
+        """Cria uma máscara binária usando thresholding dinâmico (Otsu)."""
+        try:
+            from skimage.filters import threshold_otsu
+            # O Otsu encontra o limiar ideal baseado no histograma do ExG
+            thresh = threshold_otsu(exg_array)
+            mask = np.where(exg_array > thresh, 255, 0).astype(np.uint8)
+        except ImportError:
+            # Fallback se a biblioteca não estiver instalada
+            mask = np.where(exg_array > self.threshold, 255, 0).astype(np.uint8)
+        except ValueError:
+            # Fallback se a imagem for uniforme demais para o Otsu
+            mask = np.where(exg_array > self.threshold, 255, 0).astype(np.uint8)
         return mask
 
     def apply_mask(self, img_array, mask):

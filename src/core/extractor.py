@@ -21,14 +21,21 @@ class FeatureExtractor:
         edge_v = np.diff(mask, axis=1)
         perimetro = np.count_nonzero(edge_h) + np.count_nonzero(edge_v)
 
+        # Novas features para invariância de escala
+        area_total = mask.shape[0] * mask.shape[1]
+        area_relativa = round(area / area_total, 6)
+        perimetro_norm = round(perimetro / (area ** 0.5), 4) if area > 0 else 0
+
         aspect_ratio = round(width / height, 4)
         solidez = round(area / (width * height), 4)
         circularidade = round((4 * np.pi * area) / (perimetro ** 2), 4) if perimetro > 0 else 0
 
         return {
             "area_px": area,
+            "area_relativa": area_relativa,
             "aspect_ratio": aspect_ratio,
             "solidez": solidez,
             "circularidade": circularidade,
-            "perimetro": perimetro
+            "perimetro": perimetro,
+            "perimetro_norm": perimetro_norm
         }

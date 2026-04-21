@@ -25,7 +25,7 @@ def main():
         return
     
     model = joblib.load(model_path)
-    processor = PlantProcessor(threshold=25)
+    processor = PlantProcessor(threshold=15)
     extractor = FeatureExtractor()
 
     # 3. Localizar fotos para teste (na raiz de data/raw)
@@ -55,13 +55,15 @@ def main():
         features = extractor.get_shape_features(mask)
         
         if features:
-            # Organiza os dados para o modelo
+            # Organiza os dados para o modelo (7 features agora)
             input_data = [[
                 features['area_px'], 
+                features['area_relativa'],
                 features['aspect_ratio'], 
                 features['solidez'], 
                 features['circularidade'], 
-                features['perimetro']
+                features['perimetro'],
+                features['perimetro_norm']
             ]]
 
             # --- ETAPA 3: PREDIÇÃO ÚNICA ---
