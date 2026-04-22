@@ -76,10 +76,10 @@ def validar():
     print("="*50)
 
     # Testar o modelo de Ontem (Original)
-    testar_modelo(os.path.join(output_dir, "modelo_20260420_seq01.pkl"), "MODELO ANTERIOR")
+    testar_modelo(os.path.join(output_dir, "modelo_20260421_seq03.pkl"), "MODELO ANTERIOR")
     
     # Testar o modelo de Hoje (Último gerado)
-    testar_modelo(os.path.join(output_dir, "modelo_20260421_seq02.pkl".replace(".onnx", ".pkl")), "MODELO ATUAL")
+    testar_modelo(os.path.join(output_dir, "modelo_20260422_seq01.pkl".replace(".onnx", ".pkl")), "MODELO ATUAL")
 
 if __name__ == "__main__":
     validar()
