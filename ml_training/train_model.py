@@ -25,13 +25,15 @@ def run_training(csv_path=None, model_output_path=None):
     print(f"[TRAINER] Lendo dataset: {target_csv}")
     df = pd.read_csv(target_csv)
     
-    # Features atualizadas
-    features = ['area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm']
+    # Features atualizadas (14 no total)
+    features = [
+        'area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm',
+        'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7'
+    ]
     X = df[features].values.astype(np.float32)
     y = df['classe']
     
     # Criar grupos baseados no nome do arquivo original para evitar data leakage
-    # Ex: "90_milho_1.jpg" -> "milho_1.jpg"
     groups = df['arquivo'].apply(lambda x: x.split('_', 1)[-1])
 
     # Separação baseada em grupos
@@ -41,11 +43,16 @@ def run_training(csv_path=None, model_output_path=None):
     X_train, X_test = X[train_idx], X[test_idx]
     y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-    # Criar Pipeline (Normalização + Classificador)
-    # Isso garante que o Scaler seja exportado junto com o modelo para o Android
+    # Criar Pipeline (Normalização + Classificador Robusto)
     pipeline = Pipeline([
         ('scaler', StandardScaler()),
-        ('rf', RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced'))
+        ('rf', RandomForestClassifier(
+            n_estimators=200, 
+            max_depth=20, 
+            min_samples_leaf=2, 
+            random_state=42, 
+            class_weight='balanced'
+        ))
     ])
     
     pipeline.fit(X_train, y_train)
@@ -61,8 +68,8 @@ def run_training(csv_path=None, model_output_path=None):
     
     # 2. Salva ONNX (Pipeline completo para Android)
     try:
-        # 7 features agora
-        initial_type = [('float_input', FloatTensorType([None, 7]))]
+        # Agora temos 14 features
+        initial_type = [('float_input', FloatTensorType([None, 14]))]
         onx = convert_sklearn(pipeline, initial_types=initial_type, target_opset=12)
         with open(onnx_output_path, "wb") as f:
             f.write(onx.SerializeToString())

@@ -26,7 +26,11 @@ def run_processing(output_csv_path=None):
     
     total_dados = 0
     with open(report_path, mode='w', newline='') as csv_file:
-        fieldnames = ['arquivo', 'classe', 'area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm']
+        fieldnames = [
+            'arquivo', 'classe', 'area_px', 'area_relativa', 'aspect_ratio', 
+            'solidez', 'circularidade', 'perimetro', 'perimetro_norm',
+            'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7'
+        ]
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
 
