@@ -9,6 +9,8 @@ sys.path.append(os.path.join(root_dir, 'src'))
 
 from core.processor import PlantProcessor
 from core.extractor import FeatureExtractor
+sys.path.append(os.path.join(root_dir, 'src/detection'))
+from detector import FieldDetector
 
 def gerar_dataset_teste():
     # Pasta de origem das fotos de teste
@@ -16,21 +18,20 @@ def gerar_dataset_teste():
     output_dir = os.path.join(root_dir, "data/output")
     
     # Nome do arquivo de saída (ajustado para a sequência atual)
-    report_path = os.path.join(output_dir, "dataset_teste_20260422_seq02.csv")
+    report_path = os.path.join(output_dir, "dataset_teste_20260423_seq03.csv")
     
     if not os.path.exists(raw_teste_dir):
         print(f"Erro: Pasta de teste nao encontrada em {raw_teste_dir}")
         return
 
-    processor = PlantProcessor(threshold=25)
+    processor = PlantProcessor(threshold=15)
     extractor = FeatureExtractor()
+    detector = FieldDetector()
     
     classes = ["milho", "erva_daninha"]
-    # Para teste, geralmente nao usamos rotacao (augmentation) para ser um teste "limpo"
-    # Mas se quiser, pode ativar mudando para [0, 90, 180, 270]
     rotacoes = [0] 
 
-    print(f"\n[TEST_GEN] Gerando dataset de teste com 14 features...")
+    print(f"\n[TEST_GEN] Gerando dataset de teste (Filtro 1200px)...")
     
     total_dados = 0
     with open(report_path, mode='w', newline='') as csv_file:
@@ -44,31 +45,31 @@ def gerar_dataset_teste():
 
         for cls in classes:
             input_folder = os.path.join(raw_teste_dir, cls)
-            
-            if not os.path.exists(input_folder): 
-                print(f"  [AVISO] Pasta da classe {cls} nao encontrada em: {input_folder}")
-                continue
+            if not os.path.exists(input_folder): continue
             
             files = [f for f in os.listdir(input_folder) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
-            print(f"  Processando {len(files)} imagens de {cls}...")
             
             for filename in files:
                 img_path = os.path.join(input_folder, filename)
                 try:
                     img_original = processor.load_image(img_path)
-                    for angulo in rotacoes:
-                        img_rotated = processor.rotate_image(img_original, angulo)
-                        exg = processor.get_exg(img_rotated)
-                        mask = processor.create_mask(exg)
-                        data = extractor.get_shape_features(mask)
-                        
+                    exg = processor.get_exg(img_original)
+                    mask = processor.create_mask(exg)
+                    
+                    # Usa o mesmo filtro de 1200px do treino
+                    plantas = detector.segment_plants(mask, min_area=1200)
+                    
+                    for i, planta in enumerate(plantas):
+                        data = extractor.get_shape_features(planta['mask'])
                         if data:
-                            data['arquivo'] = filename
+                            data['arquivo'] = f"p{i}_{filename}"
                             data['classe'] = cls
                             writer.writerow({k: data[k] for k in fieldnames})
                             total_dados += 1
                 except Exception as e:
                     print(f"  [ERRO] {filename}: {e}")
+
+
 
     print(f"\n[TEST_GEN] Concluido! {total_dados} amostras salvas em: {report_path}")
 
