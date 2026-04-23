@@ -2,9 +2,10 @@ import os
 import sys
 from datetime import datetime
 
-# Adiciona pastas ao path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'ml_training'))
+# Sobe um nível para achar a raiz do projeto
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(root_dir, 'src'))
+sys.path.append(os.path.join(root_dir, 'ml_training'))
 
 from main import run_processing
 from train_model import run_training
@@ -13,7 +14,6 @@ def main():
     date_str = datetime.now().strftime("%Y%m%d")
     seq = "seq02" # Segunda rodada do dia
     
-    root_dir = os.path.dirname(os.path.abspath(__file__))
     output_dir = os.path.join(root_dir, "data/output")
     
     # 1. Gerar Dataset de Treinamento (Fotos de Ontem/Base)

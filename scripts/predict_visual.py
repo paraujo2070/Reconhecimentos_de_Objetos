@@ -4,16 +4,16 @@ import joblib
 import numpy as np
 from PIL import Image, ImageDraw
 
-# Ajusta o path para os módulos core
-sys.path.append(os.path.join(os.path.dirname(__file__), 'core'))
+# Sobe um nível para achar a raiz do projeto e a pasta src
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(root_dir, 'src'))
 
-from processor import PlantProcessor
-from extractor import FeatureExtractor
+from core.processor import PlantProcessor
+from core.extractor import FeatureExtractor
 
 def main():
     # 1. Configuração de Caminhos
-    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    model_path = os.path.join(root_dir, "data/output/modelo_plantas.pkl")
+    model_path = os.path.join(root_dir, "data/output/modelo_20260422_seq02.pkl")
     raw_dir = os.path.join(root_dir, "data/raw")
     output_dir = os.path.join(root_dir, "data/output/predicoes_diretas")
     

@@ -5,14 +5,15 @@ import numpy as np
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 def validar():
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # Sobe um nível para achar a raiz do projeto
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     output_dir = os.path.join(base_dir, "data/output")
     
     # 1. Carregar o Dataset de Teste de HOJE (Quarentena)
-    test_csv = os.path.join(output_dir, "dataset_teste_20260421_seq02.csv")
+    test_csv = os.path.join(output_dir, "dataset_teste_20260422_seq02.csv")
     if not os.path.exists(test_csv):
         # Tenta a seq03 se a 02 não existir
-        test_csv = os.path.join(output_dir, "dataset_teste_20260421_seq03.csv")
+        test_csv = os.path.join(output_dir, "dataset_teste_20260421_seq02.csv")
     
     if not os.path.exists(test_csv):
         print(f"Erro: Dataset de teste não encontrado!")
@@ -22,12 +23,19 @@ def validar():
     y_true = df_test['classe']
     classes_nomes = sorted(y_true.unique())
 
-    # Preparar as duas versões de X
+    # Preparar as versões de X (5, 7 e 14 features)
     features_5 = ['area_px', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro']
     features_7 = ['area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm']
+    features_14 = [
+        'area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm',
+        'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7'
+    ]
     
-    X_5 = df_test[features_5].values.astype(np.float32)
-    X_7 = df_test[features_7].values.astype(np.float32)
+    X_dict = {
+        5: df_test[features_5].values.astype(np.float32) if all(c in df_test.columns for c in features_5) else None,
+        7: df_test[features_7].values.astype(np.float32) if all(c in df_test.columns for c in features_7) else None,
+        14: df_test[features_14].values.astype(np.float32) if all(c in df_test.columns for c in features_14) else None
+    }
 
     def testar_modelo(caminho, label):
         if not os.path.exists(caminho):
@@ -37,19 +45,20 @@ def validar():
         try:
             model = joblib.load(caminho)
             
-            # Detectar automaticamente se o modelo quer 5 ou 7 features
-            # Algumas versões do sklearn usam n_features_in_
-            try:
-                if hasattr(model, 'n_features_in_'):
-                    n_features = model.n_features_in_
-                elif hasattr(model, 'steps'): # Se for Pipeline
-                    n_features = model.steps[0][1].n_features_in_
-                else:
-                    n_features = 5 # Fallback
-            except:
-                n_features = 7 if "20260421" in caminho or "seq" in caminho else 5
+            # Detectar n_features necessário
+            if hasattr(model, 'n_features_in_'):
+                n_features = model.n_features_in_
+            elif hasattr(model, 'steps'): # Se for Pipeline (nosso caso)
+                # O Scaler é o primeiro step e ele sabe quantas features recebeu
+                n_features = model.steps[0][1].n_features_in_
+            else:
+                n_features = 14 if "seq02" in caminho else (7 if "seq" in caminho else 5)
 
-            X_input = X_7 if n_features == 7 else X_5
+            X_input = X_dict.get(n_features)
+            
+            if X_input is None:
+                print(f"\n[ERRO] O modelo {os.path.basename(caminho)} exige {n_features} features, mas o CSV de teste nao as possui.")
+                return
             
             y_pred = model.predict(X_input)
             acc = accuracy_score(y_true, y_pred)
@@ -76,10 +85,10 @@ def validar():
     print("="*50)
 
     # Testar o modelo de Ontem (Original)
-    testar_modelo(os.path.join(output_dir, "modelo_20260421_seq03.pkl"), "MODELO ANTERIOR")
+    testar_modelo(os.path.join(output_dir, "modelo_20260422_seq02.pkl"), "MODELO ANTERIOR")
     
     # Testar o modelo de Hoje (Último gerado)
-    testar_modelo(os.path.join(output_dir, "modelo_20260422_seq01.pkl".replace(".onnx", ".pkl")), "MODELO ATUAL")
+    testar_modelo(os.path.join(output_dir, "modelo_20260423_seq01.pkl".replace(".onnx", ".pkl")), "MODELO ATUAL")
 
 if __name__ == "__main__":
     validar()
