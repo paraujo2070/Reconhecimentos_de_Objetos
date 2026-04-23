@@ -12,7 +12,7 @@ from train_model import run_training
 
 def main():
     date_str = datetime.now().strftime("%Y%m%d")
-    seq = "seq02" # Segunda rodada do dia
+    seq = "seq02" # Nova rodada com segmentação no treino
     
     output_dir = os.path.join(root_dir, "data/output")
     

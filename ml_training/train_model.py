@@ -33,8 +33,16 @@ def run_training(csv_path=None, model_output_path=None):
     X = df[features].values.astype(np.float32)
     y = df['classe']
     
-    # Criar grupos baseados no nome do arquivo original para evitar data leakage
-    groups = df['arquivo'].apply(lambda x: x.split('_', 1)[-1])
+    # Criar grupos baseados no nome do arquivo ORIGINAL
+    # Formato esperado: "angulo_p0_nomeoriginal.jpg" -> Extraímos apenas "nomeoriginal.jpg"
+    def extrair_nome_original(nome):
+        partes = nome.split('_')
+        # Se o nome tem o padrão angulo_pX_nome, o nome original começa na posição 2
+        if len(partes) > 2 and partes[1].startswith('p'):
+            return "_".join(partes[2:])
+        return nome
+
+    groups = df['arquivo'].apply(extrair_nome_original)
 
     # Separação baseada em grupos
     gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
@@ -80,4 +88,7 @@ def run_training(csv_path=None, model_output_path=None):
     return target_model
 
 if __name__ == "__main__":
-    run_training()
+    import sys
+    csv_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    model_arg = sys.argv[2] if len(sys.argv) > 2 else None
+    run_training(csv_path=csv_arg, model_output_path=model_arg)

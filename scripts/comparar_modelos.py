@@ -10,7 +10,7 @@ def validar():
     output_dir = os.path.join(base_dir, "data/output")
     
     # 1. Carregar o Dataset de Teste de HOJE (Quarentena)
-    test_csv = os.path.join(output_dir, "dataset_teste_20260422_seq02.csv")
+    test_csv = os.path.join(output_dir, "dataset_teste_20260423_seq03.csv")
     if not os.path.exists(test_csv):
         # Tenta a seq03 se a 02 não existir
         test_csv = os.path.join(output_dir, "dataset_teste_20260421_seq02.csv")
@@ -85,10 +85,11 @@ def validar():
     print("="*50)
 
     # Testar o modelo de Ontem (Original)
-    testar_modelo(os.path.join(output_dir, "modelo_20260422_seq02.pkl"), "MODELO ANTERIOR")
+    testar_modelo(os.path.join(output_dir, "modelo_20260423_seq01.pkl"), "MODELO ANTERIOR (HU)")
     
     # Testar o modelo de Hoje (Último gerado)
-    testar_modelo(os.path.join(output_dir, "modelo_20260423_seq01.pkl".replace(".onnx", ".pkl")), "MODELO ATUAL")
+    testar_modelo(os.path.join(output_dir, "modelo_20260423_seq02.pkl"), "MODELO ATUAL (HU + SEG)")
+
 
 if __name__ == "__main__":
     validar()

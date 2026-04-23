@@ -7,7 +7,7 @@ def ver_importancia():
     # Detecta a raiz do projeto (um nível acima da pasta scripts)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     # Apontando para o novo modelo seq02
-    model_path = os.path.join(base_dir, 'data/output/modelo_20260422_seq02.pkl')
+    model_path = os.path.join(base_dir, 'data/output/modelo_20260423_seq02.pkl')
     
     if not os.path.exists(model_path):
         print(f"Erro: Modelo {model_path} nao encontrado.")
@@ -39,7 +39,7 @@ def ver_importancia():
         df_imp = df_imp.sort_values(by='Importancia (%)', ascending=False)
 
         print("\n" + "="*50)
-        print("IMPORTANCIA DAS CARACTERISTICAS - MODELO 20260423_seq01 (14 FEATURES)")
+        print("IMPORTANCIA DAS CARACTERISTICAS - modelo_20260423_seq02 (14 FEATURES)")
         print("="*50)
         print(df_imp.to_string(index=False, float_format=lambda x: "{:.2f}%".format(x)))
         print("="*50)
