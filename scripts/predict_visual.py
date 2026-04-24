@@ -55,15 +55,20 @@ def main():
         features = extractor.get_shape_features(mask)
         
         if features:
-            # Organiza os dados para o modelo (7 features agora)
+            # Organiza os dados para o modelo (12 features)
             input_data = [[
-                features['area_px'], 
                 features['area_relativa'],
                 features['aspect_ratio'], 
                 features['solidez'], 
                 features['circularidade'], 
-                features['perimetro'],
-                features['perimetro_norm']
+                features['perimetro_norm'],
+                features['hu_1'],
+                features['hu_2'],
+                features['hu_3'],
+                features['hu_4'],
+                features['hu_5'],
+                features['hu_6'],
+                features['hu_7']
             ]]
 
             # --- ETAPA 3: PREDIÇÃO ÚNICA ---

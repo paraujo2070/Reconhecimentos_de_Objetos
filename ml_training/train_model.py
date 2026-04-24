@@ -25,9 +25,9 @@ def run_training(csv_path=None, model_output_path=None):
     print(f"[TRAINER] Lendo dataset: {target_csv}")
     df = pd.read_csv(target_csv)
     
-    # Features atualizadas (14 no total)
+    # Features atualizadas (12 no total)
     features = [
-        'area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm',
+        'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro_norm',
         'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7'
     ]
     X = df[features].values.astype(np.float32)
@@ -55,9 +55,10 @@ def run_training(csv_path=None, model_output_path=None):
     pipeline = Pipeline([
         ('scaler', StandardScaler()),
         ('rf', RandomForestClassifier(
-            n_estimators=200, 
-            max_depth=20, 
-            min_samples_leaf=2, 
+            n_estimators=150, 
+            max_depth=None, 
+            min_samples_leaf=3,
+            min_samples_split=15, 
             random_state=42, 
             class_weight='balanced'
         ))
@@ -76,8 +77,8 @@ def run_training(csv_path=None, model_output_path=None):
     
     # 2. Salva ONNX (Pipeline completo para Android)
     try:
-        # Agora temos 14 features
-        initial_type = [('float_input', FloatTensorType([None, 14]))]
+        # Agora temos 12 features
+        initial_type = [('float_input', FloatTensorType([None, 12]))]
         onx = convert_sklearn(pipeline, initial_types=initial_type, target_opset=12)
         with open(onnx_output_path, "wb") as f:
             f.write(onx.SerializeToString())

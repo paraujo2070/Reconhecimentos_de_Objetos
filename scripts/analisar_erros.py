@@ -31,7 +31,10 @@ def analisar():
         model = load_model(model_path)
         df_test = pd.read_csv(test_csv)
 
-        features = ['area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm']
+        features = [
+            'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro_norm',
+            'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7'
+        ]
         X = df_test[features].values.astype(np.float32)
         y_true = df_test['classe']
         y_pred = model.predict(X)

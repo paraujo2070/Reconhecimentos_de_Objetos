@@ -49,12 +49,10 @@ class FeatureExtractor:
                 hu_log.append(0.0)
 
         return {
-            "area_px": area,
             "area_relativa": area_relativa,
             "aspect_ratio": aspect_ratio,
             "solidez": solidez,
             "circularidade": circularidade,
-            "perimetro": perimetro,
             "perimetro_norm": perimetro_norm,
             "hu_1": hu_log[0],
             "hu_2": hu_log[1],

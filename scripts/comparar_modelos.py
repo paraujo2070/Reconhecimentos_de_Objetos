@@ -23,18 +23,19 @@ def validar():
     y_true = df_test['classe']
     classes_nomes = sorted(y_true.unique())
 
-    # Preparar as versões de X (5, 7 e 14 features)
-    features_5 = ['area_px', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro']
-    features_7 = ['area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm']
-    features_14 = [
-        'area_px', 'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro', 'perimetro_norm',
+    # Preparar as versões de X (3, 5 e 12 features)
+    features_3 = ['aspect_ratio', 'solidez', 'circularidade']
+    features_5 = ['area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro_norm']
+    features_12 = [
+        'area_relativa', 'aspect_ratio', 'solidez', 'circularidade', 'perimetro_norm',
         'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7'
     ]
     
     X_dict = {
+        3: df_test[features_3].values.astype(np.float32) if all(c in df_test.columns for c in features_3) else None,
         5: df_test[features_5].values.astype(np.float32) if all(c in df_test.columns for c in features_5) else None,
-        7: df_test[features_7].values.astype(np.float32) if all(c in df_test.columns for c in features_7) else None,
-        14: df_test[features_14].values.astype(np.float32) if all(c in df_test.columns for c in features_14) else None
+        12: df_test[features_12].values.astype(np.float32) if all(c in df_test.columns for c in features_12) else None,
+        14: None # Desativado
     }
 
     def testar_modelo(caminho, label):
@@ -52,7 +53,7 @@ def validar():
                 # O Scaler é o primeiro step e ele sabe quantas features recebeu
                 n_features = model.steps[0][1].n_features_in_
             else:
-                n_features = 14 if "seq02" in caminho else (7 if "seq" in caminho else 5)
+                n_features = 12 if "seq" in caminho else 5
 
             X_input = X_dict.get(n_features)
             
