@@ -9,8 +9,6 @@ sys.path.append(os.path.join(root_dir, 'src'))
 
 from core.processor import PlantProcessor
 from core.extractor import FeatureExtractor
-sys.path.append(os.path.join(root_dir, 'src/detection'))
-from detector import FieldDetector
 
 def gerar_dataset_teste():
     # Pasta de origem das fotos de teste
@@ -18,19 +16,19 @@ def gerar_dataset_teste():
     output_dir = os.path.join(root_dir, "data/output")
     
     # Nome do arquivo de saída
-    report_path = os.path.join(output_dir, "dataset_teste_padrao.csv")
+    report_path = os.path.join(output_dir, "dataset_teste_global.csv")
     
     if not os.path.exists(raw_teste_dir):
         print(f"Erro: Pasta de teste nao encontrada em {raw_teste_dir}")
         return
 
+    # Threshold 15 (conforme solicitado)
     processor = PlantProcessor(threshold=15)
     extractor = FeatureExtractor()
-    detector = FieldDetector()
     
     classes = ["milho", "erva_daninha"]
 
-    print(f"\n[TEST_GEN] Gerando dataset de teste (19 features)...")
+    print(f"\n[TEST_GEN] Gerando dataset de teste GLOBAL (sem segmentação)...")
     
     total_dados = 0
     with open(report_path, mode='w', newline='') as csv_file:
@@ -58,23 +56,18 @@ def gerar_dataset_teste():
                     exg = processor.get_exg(img_original)
                     mask = processor.create_mask(exg)
                     
-                    # Filtro de 1200px (mesmo do treino)
-                    plantas = detector.segment_plants(mask, min_area=1200)
+                    # Extração GLOBAL da imagem de teste
+                    data = extractor.get_shape_features(mask, exg_values=exg)
                     
-                    for i, planta in enumerate(plantas):
-                        # Extrai o pedaço do ExG para o cálculo do ExG médio
-                        exg_planta = exg[planta['bbox']]
-                        data = extractor.get_shape_features(planta['mask'], exg_values=exg_planta)
-                        
-                        if data:
-                            data['arquivo'] = f"p{i}_{filename}"
-                            data['classe'] = cls
-                            writer.writerow({k: data[k] for k in fieldnames})
-                            total_dados += 1
+                    if data:
+                        data['arquivo'] = filename
+                        data['classe'] = cls
+                        writer.writerow({k: data[k] for k in fieldnames})
+                        total_dados += 1
                 except Exception as e:
                     print(f"  [ERRO] {filename}: {e}")
 
-    print(f"\n[TEST_GEN] Concluido! {total_dados} amostras salvas em: {report_path}")
+    print(f"\n[TEST_GEN] Concluido! {total_dados} amostras globais salvas em: {report_path}")
 
 if __name__ == "__main__":
     gerar_dataset_teste()

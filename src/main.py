@@ -8,9 +8,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'core'))
 
 from processor import PlantProcessor
 from extractor import FeatureExtractor
-# Adicionado detector para segmentação
-sys.path.append(os.path.join(os.path.dirname(__file__), 'detection'))
-from detector import FieldDetector
 
 def run_processing(output_csv_path=None):
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -19,15 +16,14 @@ def run_processing(output_csv_path=None):
     
     os.makedirs(output_dir, exist_ok=True)
 
-    processor = PlantProcessor(threshold=25)
+    processor = PlantProcessor(threshold=15)
     extractor = FeatureExtractor()
-    detector = FieldDetector()
     
     report_path = output_csv_path if output_csv_path else os.path.join(output_dir, "dataset_treinamento.csv")
     classes = ["milho", "erva_daninha"]
     rotacoes = [0, 90, 180, 270] # Data Augmentation
 
-    print(f"\n[PROCESSOR] Iniciando extração de características (com segmentação)...")
+    print(f"\n[PROCESSOR] Iniciando extração GLOBAL de características")
     
     total_dados = 0
     with open(report_path, mode='w', newline='') as csv_file:
@@ -63,27 +59,18 @@ def run_processing(output_csv_path=None):
                         exg = processor.get_exg(img_rotated)
                         mask = processor.create_mask(exg)
                         
-                        # Filtro inteligente: Área maior e limite de plantas por foto
-                        plantas = detector.segment_plants(mask, min_area=1200)
-                        plantas = sorted(plantas, key=lambda p: np.count_nonzero(p['mask']), reverse=True)[:15]
+                        # Extração GLOBAL: Considera todo o verde da imagem como um único registro
+                        data = extractor.get_shape_features(mask, exg_values=exg)
                         
-                        for i, planta in enumerate(plantas):
-                            # Extrai os valores de ExG correspondentes à planta para o cálculo do ExG médio
-                            exg_planta = exg[planta['bbox']]
-                            
-                            # Extrai features de cada planta individualmente
-                            data = extractor.get_shape_features(planta['mask'], exg_values=exg_planta)
-                            
-                            if data:
-                                data['arquivo'] = f"{angulo}_p{i}_{filename}"
-                                data['classe'] = cls
-                                writer.writerow({k: data[k] for k in fieldnames})
-                                total_dados += 1
+                        if data:
+                            data['arquivo'] = f"{angulo}_{filename}"
+                            data['classe'] = cls
+                            writer.writerow({k: data[k] for k in fieldnames})
+                            total_dados += 1
                 except Exception as e:
                     print(f"  [ERRO] {filename}: {e}")
 
-
-    print(f"[PROCESSOR] Concluído. {total_dados} amostras geradas em {report_path}")
+    print(f"[PROCESSOR] Concluído. {total_dados} amostras globais geradas em {report_path}")
     return report_path, total_dados
 
 if __name__ == "__main__":
