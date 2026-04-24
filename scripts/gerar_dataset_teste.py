@@ -17,8 +17,8 @@ def gerar_dataset_teste():
     raw_teste_dir = os.path.join(root_dir, "data/raw/teste")
     output_dir = os.path.join(root_dir, "data/output")
     
-    # Nome do arquivo de saída (ajustado para a sequência atual)
-    report_path = os.path.join(output_dir, "dataset_teste_20260423_seq03.csv")
+    # Nome do arquivo de saída
+    report_path = os.path.join(output_dir, "dataset_teste_padrao.csv")
     
     if not os.path.exists(raw_teste_dir):
         print(f"Erro: Pasta de teste nao encontrada em {raw_teste_dir}")
@@ -29,17 +29,19 @@ def gerar_dataset_teste():
     detector = FieldDetector()
     
     classes = ["milho", "erva_daninha"]
-    rotacoes = [0] 
 
-    print(f"\n[TEST_GEN] Gerando dataset de teste (Filtro 1200px)...")
+    print(f"\n[TEST_GEN] Gerando dataset de teste (19 features)...")
     
     total_dados = 0
     with open(report_path, mode='w', newline='') as csv_file:
         fieldnames = [
-            'arquivo', 'classe', 'area_relativa', 'aspect_ratio',
+            'arquivo', 'classe', 'area_relativa', 'aspect_ratio', 
             'solidez', 'circularidade', 'perimetro_norm',
-            'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7'
-        ]        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            'convexidade', 'excentricidade', 'exg_medio',
+            'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7',
+            'zernike_1', 'zernike_2', 'zernike_3', 'zernike_4'
+        ]
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
 
         for cls in classes:
@@ -47,6 +49,7 @@ def gerar_dataset_teste():
             if not os.path.exists(input_folder): continue
             
             files = [f for f in os.listdir(input_folder) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
+            print(f"  Processando {len(files)} imagens de {cls}...")
             
             for filename in files:
                 img_path = os.path.join(input_folder, filename)
@@ -55,11 +58,14 @@ def gerar_dataset_teste():
                     exg = processor.get_exg(img_original)
                     mask = processor.create_mask(exg)
                     
-                    # Usa o mesmo filtro de 1200px do treino
+                    # Filtro de 1200px (mesmo do treino)
                     plantas = detector.segment_plants(mask, min_area=1200)
                     
                     for i, planta in enumerate(plantas):
-                        data = extractor.get_shape_features(planta['mask'])
+                        # Extrai o pedaço do ExG para o cálculo do ExG médio
+                        exg_planta = exg[planta['bbox']]
+                        data = extractor.get_shape_features(planta['mask'], exg_values=exg_planta)
+                        
                         if data:
                             data['arquivo'] = f"p{i}_{filename}"
                             data['classe'] = cls
@@ -67,8 +73,6 @@ def gerar_dataset_teste():
                             total_dados += 1
                 except Exception as e:
                     print(f"  [ERRO] {filename}: {e}")
-
-
 
     print(f"\n[TEST_GEN] Concluido! {total_dados} amostras salvas em: {report_path}")
 

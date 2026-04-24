@@ -34,7 +34,9 @@ def run_processing(output_csv_path=None):
         fieldnames = [
             'arquivo', 'classe', 'area_relativa', 'aspect_ratio', 
             'solidez', 'circularidade', 'perimetro_norm',
-            'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7'
+            'convexidade', 'excentricidade', 'exg_medio',
+            'hu_1', 'hu_2', 'hu_3', 'hu_4', 'hu_5', 'hu_6', 'hu_7',
+            'zernike_1', 'zernike_2', 'zernike_3', 'zernike_4'
         ]
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
@@ -62,16 +64,15 @@ def run_processing(output_csv_path=None):
                         mask = processor.create_mask(exg)
                         
                         # Filtro inteligente: Área maior e limite de plantas por foto
-                        # min_area=1200 remove pequenos fragmentos e foca em plantas reais
                         plantas = detector.segment_plants(mask, min_area=1200)
-                        
-                        # Ordenar por tamanho (área) e pegar no máximo as 15 maiores
-                        # Isso evita que fotos de erva-daninha com muita sujeira sufoquem o milho
                         plantas = sorted(plantas, key=lambda p: np.count_nonzero(p['mask']), reverse=True)[:15]
                         
                         for i, planta in enumerate(plantas):
+                            # Extrai os valores de ExG correspondentes à planta para o cálculo do ExG médio
+                            exg_planta = exg[planta['bbox']]
+                            
                             # Extrai features de cada planta individualmente
-                            data = extractor.get_shape_features(planta['mask'])
+                            data = extractor.get_shape_features(planta['mask'], exg_values=exg_planta)
                             
                             if data:
                                 data['arquivo'] = f"{angulo}_p{i}_{filename}"
