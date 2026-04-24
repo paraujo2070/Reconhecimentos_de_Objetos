@@ -1,13 +1,13 @@
 import numpy as np
 import cv2
-from skimage.feature import moments_zernike
+import mahotas
 
 class FeatureExtractor:
     @staticmethod
     def get_shape_features(mask, exg_values=None):
         """
-        Extrai características de UMA única planta.
-        Novas métricas: Convexidade, Excentricidade, ExG Médio e Zernike (skimage).
+        Extrai 19 características de UMA única planta.
+        Inclui métricas de forma, intensidade e Momentos de Zernike (via Mahotas).
         """
         coords = np.argwhere(mask > 0)
         if len(coords) == 0:
@@ -37,11 +37,13 @@ class FeatureExtractor:
         # 2. Excentricidade (via Elipse Ajustada)
         excentricidade = 0
         if len(cnt) >= 5:
-            (x, y), (MA, ma), angle = cv2.fitEllipse(cnt)
-            a = ma / 2
-            b = MA / 2
-            if a > 0:
-                excentricidade = round(np.sqrt(1 - (min(a, b)**2 / max(a, b)**2)), 4)
+            try:
+                (x, y), (MA, ma), angle = cv2.fitEllipse(cnt)
+                a = ma / 2
+                b = MA / 2
+                if a > 0:
+                    excentricidade = round(np.sqrt(1 - (min(a, b)**2 / max(a, b)**2)), 4)
+            except: excentricidade = 0
 
         # 3. ExG Médio
         exg_medio = 0
@@ -67,13 +69,14 @@ class FeatureExtractor:
             else:
                 hu_log.append(0.0)
 
-        # 4. Momentos de Zernike (via Scikit-Image)
-        # Usamos radius como a metade da maior dimensão para cobrir a planta
+        # 4. Momentos de Zernike (via Mahotas)
+        # Raio de computação: metade da maior dimensão
         radius = max(width, height) / 2
-        # Ordem 4 retorna uma lista de momentos que descrevem a complexidade da forma
-        zernike = moments_zernike(mask_cv, radius=radius, order=4)
-        # Pegamos os 4 primeiros componentes significativos (ignorando o primeiro que é constante)
-        z_feats = [round(float(np.abs(z)), 6) for z in zernike[1:5]]
+        # mahotas.features.zernike_moments retorna um array de momentos
+        # O grau 4 fornece informação suficiente para a forma
+        z_moments = mahotas.features.zernike_moments(mask_cv, radius, degree=4)
+        # Selecionamos os 4 primeiros (excluindo o DC se necessário, mas aqui pegamos em sequência)
+        z_feats = [round(float(z), 6) for z in z_moments[:4]]
 
         return {
             "area_relativa": area_relativa,
